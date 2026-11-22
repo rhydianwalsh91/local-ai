@@ -1,33 +1,36 @@
 # switchboard job map. Apps ask for a *job* (chat, classify, ...); this file says which model does it.
+# Shared by every language package (bundled into each at build time), so keep it language-neutral.
 #
-# AI_ENV=dev|prod (env var or .env) picks the column. [env.<name>] values apply to every job in
-# that env, and a job's own table can override any of them. Model strings are LiteLLM names:
-# "<provider>/<model>". Keys other than model/method/api_base/timeout are passed straight to LiteLLM.
+# AI_ENV=local|nonlocal (env var or .env) picks the column: local = the mini PC, nonlocal = a
+# frontier API. [env.<name>] values apply to every job in
+# that env, and a job's own table can override any of them. Model strings use LiteLLM's naming,
+# "<provider>/<model>", in every language. Keys other than model/method/api_base/timeout are
+# passed straight to the provider library (LiteLLM in Python).
 #
 # A project can add or override jobs without editing this file: point SWITCHBOARD_CONFIG at its own
 # TOML file and it is merged on top of this one.
 
-[env.dev]
+[env.local]
 api_base = "http://192.168.68.158:11434"  # Ollama in LXC 101 on the mini PC
 timeout = 300                             # seconds: a cold model takes 45-110 s just to load
 num_retries = 0                           # Ollama runs one request at a time; retries would just queue
 
-[env.prod]
+[env.nonlocal]
 timeout = 60
 num_retries = 2
 
-[jobs.chat.dev]
+[jobs.chat.local]
 model = "ollama_chat/gemma4-cpu"
 think = false  # gemma4 thinks by default; on this CPU that's minutes of hidden tokens per reply
 
-[jobs.chat.prod]
+[jobs.chat.nonlocal]
 model = ""  # not chosen yet, e.g. "<provider>/<model>". The provider's API key goes in .env.
 
-[jobs.classify.dev]
+[jobs.classify.local]
 model = "ollama/tev1:4b"
 method = "systemone"  # tev1's native decision endpoint (/v1/systemone)
 timeout = 120
 
-[jobs.classify.prod]
+[jobs.classify.nonlocal]
 model = ""      # not chosen yet; any chat model that supports JSON-schema output works
 method = "json" # ask the model for the same answers as structured JSON

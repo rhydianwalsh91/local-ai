@@ -1,0 +1,26 @@
+{
+  "about": "Question sets that classify() must reject before making any request. The error type InvalidQuestions maps to each language's usual argument error (ValueError in Python, e.g. TypeError in TypeScript). Question types other than noul/choice/score are rejected: box needs an image and classify only takes text.",
+  "cases": [
+    { "name": "no questions", "questions": {}, "error": { "type": "InvalidQuestions" } },
+    {
+      "name": "unsupported type",
+      "questions": { "q": { "type": "box", "instructions": "Find the mug" } },
+      "error": { "type": "InvalidQuestions", "message_contains": "q" }
+    },
+    {
+      "name": "missing type",
+      "questions": { "q": { "instructions": "Is it sunny?" } },
+      "error": { "type": "InvalidQuestions", "message_contains": "q" }
+    },
+    {
+      "name": "choice without criteria",
+      "questions": { "topic": { "type": "choice", "instructions": "What is it about?" } },
+      "error": { "type": "InvalidQuestions", "message_contains": "topic" }
+    },
+    {
+      "name": "score without criteria",
+      "questions": { "level": { "type": "score", "criteria": [] } },
+      "error": { "type": "InvalidQuestions", "message_contains": "level" }
+    }
+  ]
+}

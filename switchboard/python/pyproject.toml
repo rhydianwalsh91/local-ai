@@ -1,7 +1,7 @@
 [project]
 name = "switchboard"
 version = "0.1.0"
-description = "Ask for AI jobs, not models: routes chat/classify to the local Ollama server (dev) or a frontier API (prod) via LiteLLM."
+description = "Ask for AI jobs, not models: routes chat/classify to the mini PC's Ollama (local) or a frontier API (nonlocal) via LiteLLM."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -22,5 +22,5 @@ packages = ["src/switchboard"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["live: talks to the real dev server (run with SWITCHBOARD_LIVE=1)"]
+markers = ["live: talks to the real mini PC (run with SWITCHBOARD_LIVE=1)"]
 filterwarnings = ["ignore:.*ReadOnly.*:UserWarning"]  # noise from LiteLLM's pydantic types

@@ -1,0 +1,123 @@
+{
+  "about": "The response_format sent to a chat model for the `json` classify method: a strict JSON schema with one required property per question, in question order. Only probabilities are requested; choice/score are derived from them. Compare as parsed JSON (key order doesn't matter, array order does).",
+  "cases": [
+    {
+      "name": "one question of each type",
+      "questions": {
+        "is_complaint": {
+          "type": "noul",
+          "instructions": "Is the customer unhappy?",
+          "criteria": {
+            "true": "Expresses a problem.",
+            "false": "Neutral or happy."
+          }
+        },
+        "topic": {
+          "type": "choice",
+          "instructions": "What is it about?",
+          "criteria": {
+            "delivery": "Shipping",
+            "billing": "Payments",
+            "other": null
+          }
+        },
+        "urgency": {
+          "type": "score",
+          "criteria": [
+            "not urgent",
+            "somewhat urgent",
+            "very urgent"
+          ]
+        }
+      },
+      "response_format": {
+        "type": "json_schema",
+        "json_schema": {
+          "name": "answers",
+          "schema": {
+            "type": "object",
+            "properties": {
+              "is_complaint": {
+                "type": "object",
+                "properties": {
+                  "noul": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "noul"
+                ],
+                "additionalProperties": false
+              },
+              "topic": {
+                "type": "object",
+                "properties": {
+                  "probabilities": {
+                    "type": "object",
+                    "properties": {
+                      "delivery": {
+                        "type": "number"
+                      },
+                      "billing": {
+                        "type": "number"
+                      },
+                      "other": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "delivery",
+                      "billing",
+                      "other"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "probabilities"
+                ],
+                "additionalProperties": false
+              },
+              "urgency": {
+                "type": "object",
+                "properties": {
+                  "probabilities": {
+                    "type": "object",
+                    "properties": {
+                      "0": {
+                        "type": "number"
+                      },
+                      "1": {
+                        "type": "number"
+                      },
+                      "2": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "0",
+                      "1",
+                      "2"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "probabilities"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "is_complaint",
+              "topic",
+              "urgency"
+            ],
+            "additionalProperties": false
+          },
+          "strict": true
+        }
+      }
+    }
+  ]
+}

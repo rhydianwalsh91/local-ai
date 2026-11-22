@@ -1,4 +1,4 @@
-"""Calls the real dev server. Skipped unless SWITCHBOARD_LIVE=1 (a cold start takes ~1-2 minutes)."""
+"""Calls the real mini PC. Skipped unless SWITCHBOARD_LIVE=1 (a cold start takes ~1-2 minutes)."""
 
 import os
 

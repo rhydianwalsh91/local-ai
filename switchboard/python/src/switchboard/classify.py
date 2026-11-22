@@ -10,13 +10,14 @@ and the result always has the System One answer shape, whichever backend ran:
     {"is_complaint": {"type": "noul", "noul": 0.95}}
 
 Two methods, chosen per env in jobs.toml:
-  systemone - the model's native decision endpoint (tev1 on Ollama, in dev).
-  json      - ask a chat model for the same answers as structured JSON (frontier model, in prod).
+  systemone - the model's native decision endpoint (tev1 on the mini PC, for local).
+  json      - ask a chat model for the same answers as structured JSON (frontier model, for nonlocal).
 """
 
 from __future__ import annotations
 
 import json
+from importlib import resources
 from typing import Any
 
 import litellm
@@ -63,14 +64,8 @@ def _via_systemone(cfg: JobConfig, text: str, questions: Questions) -> Answers:
 
 # --- json -------------------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """\
-You are a careful, calibrated classifier. Read the text and answer every question about it.
-Reply with JSON only, matching the schema.
-- "noul" questions are yes/no: give `noul`, the probability from 0 to 1 that the answer is yes (true).
-- "choice" questions: give `probabilities`, how likely each label is (summing to 1).
-- "score" questions: criteria list levels from lowest (index 0) to highest. Give `probabilities`,
-  how likely each level index is (summing to 1).
-Be honest about uncertainty: spread probability out when the text doesn't say."""
+# Shared with the other language packages: switchboard/shared/classify-prompt.txt (symlinked in).
+_SYSTEM_PROMPT = resources.files("switchboard").joinpath("classify-prompt.txt").read_text().strip()
 
 
 def _answer_schema(question: dict[str, Any]) -> dict[str, Any]:

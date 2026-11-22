@@ -3,8 +3,8 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    """Each test starts in dev with only the bundled jobs.toml, whatever the shell or .env says."""
-    monkeypatch.setenv("AI_ENV", "dev")
+    """Each test starts in local with only the bundled jobs.toml, whatever the shell or .env says."""
+    monkeypatch.setenv("AI_ENV", "local")
     monkeypatch.delenv("SWITCHBOARD_CONFIG", raising=False)
 
 

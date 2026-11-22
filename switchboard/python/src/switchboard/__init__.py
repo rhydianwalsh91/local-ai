@@ -7,7 +7,8 @@
         "is_complaint": {"type": "noul", "instructions": "Is the customer unhappy?"},
     })
 
-jobs.toml maps each job to a model for dev and prod; AI_ENV=dev|prod picks the column.
+jobs.toml maps each job to a model for local (the mini PC) and nonlocal (a frontier API);
+AI_ENV=local|nonlocal picks the column.
 """
 
 from .chat import chat

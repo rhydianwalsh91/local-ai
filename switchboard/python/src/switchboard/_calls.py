@@ -31,7 +31,7 @@ def call(cfg: JobConfig, fn: Callable[..., T], **kwargs: Any) -> T:
         hint = (
             " The first request after the model unloads can take 45-110 s just to load it; "
             "raise `timeout` for this job in jobs.toml if that's what happened."
-            if cfg.env == "dev"
+            if cfg.env == "local"
             else ""
         )
         raise ServerTimeout(
@@ -43,7 +43,7 @@ def call(cfg: JobConfig, fn: Callable[..., T], **kwargs: Any) -> T:
         if _is_network_error(e):
             hint = (
                 f" Is the mini PC on? Check with: curl {cfg.api_base}/api/version"
-                if cfg.env == "dev" and cfg.api_base
+                if cfg.env == "local" and cfg.api_base
                 else ""
             )
             raise ServerUnreachable(f"[{cfg.env}/{cfg.job}] Can't reach {_where(cfg)}.{hint}") from e
@@ -55,7 +55,7 @@ def call(cfg: JobConfig, fn: Callable[..., T], **kwargs: Any) -> T:
     except litellm.NotFoundError as e:
         raise ModelError(
             f"[{cfg.env}/{cfg.job}] {cfg.model} wasn't found at {_where(cfg)}. "
-            "Check the model name in jobs.toml (and `ollama list` on the server for dev)."
+            "Check the model name in jobs.toml (and `ollama list` on the mini PC for local)."
         ) from e
     except litellm.APIError as e:
         raise ModelError(f"[{cfg.env}/{cfg.job}] {cfg.model} failed: {e}") from e

@@ -1,0 +1,81 @@
+{
+  "about": "How a job resolves to settings. Each case: optionally merge `override` onto `base` (deep merge: nested tables merge, other values are replaced), then resolve `job` for `env`. `expect.passthrough` is every key except model/method/api_base/timeout, which goes straight to the provider library. Unset method/api_base are null; unset timeout is 60.",
+  "base": {
+    "env": {
+      "local": { "api_base": "http://local-server:11434", "timeout": 300, "num_retries": 0 },
+      "nonlocal": { "num_retries": 2 }
+    },
+    "jobs": {
+      "chat": {
+        "local": { "model": "ollama_chat/chat-model", "think": false },
+        "nonlocal": { "model": "" }
+      },
+      "classify": {
+        "local": { "model": "ollama/decide-model", "method": "systemone", "timeout": 120 },
+        "nonlocal": { "model": "someprovider/big-model", "method": "json" }
+      },
+      "localonly": {
+        "local": { "model": "ollama_chat/chat-model" }
+      }
+    }
+  },
+  "cases": [
+    {
+      "name": "env defaults fill in the job",
+      "env": "local", "job": "chat",
+      "expect": {
+        "model": "ollama_chat/chat-model", "method": null, "api_base": "http://local-server:11434",
+        "timeout": 300, "passthrough": { "num_retries": 0, "think": false }
+      }
+    },
+    {
+      "name": "a job's own value beats the env default",
+      "env": "local", "job": "classify",
+      "expect": {
+        "model": "ollama/decide-model", "method": "systemone", "api_base": "http://local-server:11434",
+        "timeout": 120, "passthrough": { "num_retries": 0 }
+      }
+    },
+    {
+      "name": "nonlocal uses the nonlocal column, local-only settings don't leak, unset timeout is 60",
+      "env": "nonlocal", "job": "classify",
+      "expect": {
+        "model": "someprovider/big-model", "method": "json", "api_base": null,
+        "timeout": 60, "passthrough": { "num_retries": 2 }
+      }
+    },
+    {
+      "name": "an empty model is a config error that says where to set it",
+      "env": "nonlocal", "job": "chat",
+      "error": { "type": "ConfigError", "message_contains": "No nonlocal model is set for job 'chat'" }
+    },
+    {
+      "name": "unknown job",
+      "env": "local", "job": "summarise",
+      "error": { "type": "ConfigError", "message_contains": "Unknown job 'summarise'" }
+    },
+    {
+      "name": "job with no section for this env",
+      "env": "nonlocal", "job": "localonly",
+      "error": { "type": "ConfigError", "message_contains": "[jobs.localonly.nonlocal]" }
+    },
+    {
+      "name": "an override can add a job, which inherits env defaults",
+      "override": { "jobs": { "summarise": { "local": { "model": "ollama_chat/chat-model", "temperature": 0.2 } } } },
+      "env": "local", "job": "summarise",
+      "expect": {
+        "model": "ollama_chat/chat-model", "method": null, "api_base": "http://local-server:11434",
+        "timeout": 300, "passthrough": { "num_retries": 0, "temperature": 0.2 }
+      }
+    },
+    {
+      "name": "an override changes one value and keeps its siblings",
+      "override": { "jobs": { "chat": { "local": { "model": "ollama_chat/other-model" } } } },
+      "env": "local", "job": "chat",
+      "expect": {
+        "model": "ollama_chat/other-model", "method": null, "api_base": "http://local-server:11434",
+        "timeout": 300, "passthrough": { "num_retries": 0, "think": false }
+      }
+    }
+  ]
+}

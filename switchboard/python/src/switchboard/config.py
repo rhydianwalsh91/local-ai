@@ -14,8 +14,8 @@ from dotenv import find_dotenv, load_dotenv
 
 from .errors import ConfigError
 
-ENVS = ("dev", "prod")
-DEFAULT_ENV = "dev"
+ENVS = ("local", "nonlocal")
+DEFAULT_ENV = "local"
 
 # Keys that switchboard itself uses; everything else in a job/env table is passed to LiteLLM.
 _OWN_KEYS = {"model", "method", "api_base", "timeout"}
@@ -46,11 +46,12 @@ def current_env() -> str:
     return env
 
 
-def _deep_merge(base: dict, override: dict) -> dict:
+def merge_config(base: dict, override: dict) -> dict:
+    """Deep-merge override onto base: nested tables merge, everything else is replaced."""
     merged = dict(base)
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
-            merged[key] = _deep_merge(merged[key], value)
+            merged[key] = merge_config(merged[key], value)
         else:
             merged[key] = value
     return merged
@@ -59,13 +60,14 @@ def _deep_merge(base: dict, override: dict) -> dict:
 def load_config() -> dict:
     """The bundled jobs.toml, with SWITCHBOARD_CONFIG (if set) merged on top."""
     _load_dotenv()
+    # switchboard/shared/jobs.toml, symlinked into the package so it ships in the wheel.
     config = tomllib.loads(resources.files("switchboard").joinpath("jobs.toml").read_text())
     override_path = os.environ.get("SWITCHBOARD_CONFIG")
     if override_path:
         path = Path(override_path).expanduser()
         if not path.is_file():
             raise ConfigError(f"SWITCHBOARD_CONFIG points to {path}, which doesn't exist")
-        config = _deep_merge(config, tomllib.loads(path.read_text()))
+        config = merge_config(config, tomllib.loads(path.read_text()))
     return config
 
 

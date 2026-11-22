@@ -1,8 +1,10 @@
 # CLAUDE.md
 
 This repo is the recipe for a self-hosted, CPU-only AI server (Ollama in Proxmox LXC 101), plus
-`switchboard/`, a Python package that routes app "jobs" to that server (dev) or a frontier API
-(prod) via LiteLLM. README.md has the full picture: hosts, settings and the reasons behind them.
+`switchboard/`, a package that routes app "jobs" to that server (`AI_ENV=local`) or a
+frontier API (`AI_ENV=nonlocal`).
+Python exists (via LiteLLM). Other languages (TypeScript is planned) go alongside it under
+`switchboard/<language>/`. README.md has the full picture: hosts, settings and the reasons behind them.
 Read it before changing server config.
 
 ## Working with the owner
@@ -31,14 +33,23 @@ Read it before changing server config.
 - `scripts/deploy.sh` runs on the Mac. It copies `ollama/` + `scripts/` to `/opt/local-ai` over SSH
   (tar, no rsync/git in the container), then runs bootstrap.
 - `tests/smoke.sh` runs on the Mac against the live API.
-- `switchboard/src/switchboard/`: `jobs.toml` (job → model per env), `config.py` (loading/merging,
-  `AI_ENV`), `_calls.py` (LiteLLM call and error translation), `chat.py`, `classify.py`.
+- `switchboard/shared/` holds everything the language packages share: `jobs.toml` (the one
+  job → model map), `classify-prompt.txt`, and `test-cases/*.json` (config resolution, JSON schema,
+  answer normalisation, question validation). **To change shared behaviour, change the test case
+  first**, then make every package pass it. Don't fix it in one language only.
+- `switchboard/python/src/switchboard/`: `config.py` (loading/merging, `AI_ENV`), `_calls.py`
+  (LiteLLM call and error translation), `chat.py`, `classify.py`. `jobs.toml` and
+  `classify-prompt.txt` there are **symlinks** to the shared files. Edit the originals, and never
+  replace the links with copies.
+- A new language package goes in `switchboard/<language>/`. It needs the same API, error names and
+  env vars, must bundle the shared files at build time, and must run every case in `shared/test-cases/`.
+  Release all packages under one version.
 
 ## Verify changes
 
 ```bash
-cd switchboard && uv run pytest                          # unit tests, offline
-cd switchboard && SWITCHBOARD_LIVE=1 uv run pytest -m live   # against the mini PC
+cd switchboard/python && uv run pytest                   # unit tests + shared test cases, offline
+cd switchboard/python && SWITCHBOARD_LIVE=1 uv run pytest -m live   # against the mini PC
 tests/smoke.sh                                           # server health and speed
 bash -n scripts/*.sh proxmox/*.sh tests/*.sh             # shell syntax
 ```
@@ -49,12 +60,14 @@ decision ~8 s warm.
 ## Gotchas (learned the hard way)
 
 - Use `gemma4-cpu`, never `gemma4:26b`: MTP speculative decoding cuts output to ~2.5 tok/s on this CPU.
-- `think` isn't a Modelfile parameter. Send `"think": false` per request (`jobs.toml` does this for dev chat).
+- `think` isn't a Modelfile parameter. Send `"think": false` per request (`jobs.toml` does this for local chat).
 - tev1 is decision-only. It can't be loaded or prompted via `/api/generate` or `/api/chat` (400
   error). Use `/v1/systemone` (`litellm.systemone` in Python).
 - LiteLLM's systemone call makes a stray `POST /v1/systemone/api/show` that gets a 404 in the Ollama
   log. It's harmless; the real request still succeeds.
 - LiteLLM needs `tenacity` for `num_retries` but doesn't depend on it. It's in switchboard's deps.
+- The Python package installs from git with `#subdirectory=switchboard/python`. Wheel builds
+  follow the symlinks, but an sdist wouldn't, so don't publish an sdist.
 - `litellm.Timeout` isn't a subclass of `litellm.APIConnectionError`, so catch it first (see `_calls.py`).
 - Debug slowness by prompt size: `journalctl -u ollama | grep "new prompt"` and look at `task.n_tokens`.
 - Don't run big downloads in parallel. It caused `unexpected EOF` failures from registries.
@@ -72,7 +85,8 @@ while loading or generating, and ~708 J per gemma load.
 
 ## Open items
 
-- Prod provider isn't chosen yet. `jobs.toml` prod models are empty on purpose, so prod calls raise
+- The nonlocal (frontier API) provider isn't chosen yet. `jobs.toml` nonlocal models are empty on
+  purpose, so nonlocal calls raise
   `ConfigError` until they're set.
-- No project uses switchboard yet. Before moving one to prod, run real examples through both envs and compare.
+- No project uses switchboard yet. Before moving one to nonlocal, run real examples through both envs and compare.
 - Optional later: Tailscale, a third model, Ansible.

@@ -3,7 +3,7 @@ import pytest
 import switchboard as ai
 
 # Port 9 on localhost is closed, so the connection is refused instantly; no network needed.
-CLOSED = '[env.dev]\napi_base = "http://127.0.0.1:9"\n'
+CLOSED = '[env.local]\napi_base = "http://127.0.0.1:9"\n'
 
 
 def test_unreachable_server_chat(override):

@@ -1,0 +1,78 @@
+{
+  "about": "Turning a chat model's raw JSON reply (json method) into the System One answer shape that tev1 returns. Rules: noul is clamped to [0, 1]. Probabilities are floored at 0 and rescaled to sum to 1 (all zero -> uniform). choice = the most likely label (ties go to the first label in question order). score = expected level index (sum of index * probability), legend maps index -> criteria text. Compare numbers with a tolerance of 1e-9. A missing answer or probability is a ModelError whose message names the missing key.",
+  "questions": {
+    "is_complaint": { "type": "noul", "instructions": "Is the customer unhappy?" },
+    "topic": { "type": "choice", "criteria": { "delivery": "Shipping", "billing": null } },
+    "urgency": { "type": "score", "criteria": ["low", "medium", "high"] }
+  },
+  "cases": [
+    {
+      "name": "well-formed reply",
+      "raw": {
+        "is_complaint": { "noul": 0.9 },
+        "topic": { "probabilities": { "delivery": 0.2, "billing": 0.8 } },
+        "urgency": { "probabilities": { "0": 0.0, "1": 0.5, "2": 0.5 } }
+      },
+      "expect": {
+        "is_complaint": { "type": "noul", "noul": 0.9 },
+        "topic": { "type": "choice", "choice": "billing", "probabilities": { "delivery": 0.2, "billing": 0.8 } },
+        "urgency": {
+          "type": "score", "score": 1.5,
+          "legend": { "0": "low", "1": "medium", "2": "high" },
+          "probabilities": { "0": 0.0, "1": 0.5, "2": 0.5 }
+        }
+      }
+    },
+    {
+      "name": "out-of-range values are clamped, weights keep their ratio",
+      "raw": {
+        "is_complaint": { "noul": 1.3 },
+        "topic": { "probabilities": { "delivery": 3, "billing": 1 } },
+        "urgency": { "probabilities": { "0": -1, "1": 2, "2": 2 } }
+      },
+      "expect": {
+        "is_complaint": { "type": "noul", "noul": 1.0 },
+        "topic": { "type": "choice", "choice": "delivery", "probabilities": { "delivery": 0.75, "billing": 0.25 } },
+        "urgency": {
+          "type": "score", "score": 1.5,
+          "legend": { "0": "low", "1": "medium", "2": "high" },
+          "probabilities": { "0": 0.0, "1": 0.5, "2": 0.5 }
+        }
+      }
+    },
+    {
+      "name": "negative noul is clamped to 0, all-zero probabilities become uniform",
+      "raw": {
+        "is_complaint": { "noul": -0.2 },
+        "topic": { "probabilities": { "delivery": 0, "billing": 0 } },
+        "urgency": { "probabilities": { "0": 0, "1": 0, "2": 0 } }
+      },
+      "expect": {
+        "is_complaint": { "type": "noul", "noul": 0.0 },
+        "topic": { "type": "choice", "choice": "delivery", "probabilities": { "delivery": 0.5, "billing": 0.5 } },
+        "urgency": {
+          "type": "score", "score": 1.0,
+          "legend": { "0": "low", "1": "medium", "2": "high" },
+          "probabilities": { "0": 0.3333333333333333, "1": 0.3333333333333333, "2": 0.3333333333333333 }
+        }
+      }
+    },
+    {
+      "name": "a missing answer is a model error",
+      "raw": {
+        "topic": { "probabilities": { "delivery": 1, "billing": 0 } },
+        "urgency": { "probabilities": { "0": 1, "1": 0, "2": 0 } }
+      },
+      "error": { "type": "ModelError", "message_contains": "is_complaint" }
+    },
+    {
+      "name": "a missing probability is a model error",
+      "raw": {
+        "is_complaint": { "noul": 0.5 },
+        "topic": { "probabilities": { "delivery": 1 } },
+        "urgency": { "probabilities": { "0": 1, "1": 0, "2": 0 } }
+      },
+      "error": { "type": "ModelError", "message_contains": "billing" }
+    }
+  ]
+}

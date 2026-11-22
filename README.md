@@ -6,7 +6,7 @@ projects use it.
 The server is a CPU-only mini PC running Proxmox. Ollama runs in an LXC container and serves a chat
 model (Gemma 4 26B MoE) and a decision/classification model (tev1). Projects never name a model.
 They ask switchboard for a *job* (`ai.chat`, `ai.classify`), and one config file sends that job to
-the mini PC in `dev` or to a frontier API in `prod`.
+the mini PC (`local`) or to a frontier API (`nonlocal`).
 
 ```
  Mac (projects + switchboard) ──LAN──▶ Proxmox host "pve" 192.168.68.200
@@ -39,7 +39,8 @@ HP ProDesk 400 G4 Mini: Intel Core i3-8100T (4 cores, AVX2, no usable GPU), 2×1
 | `scripts/bootstrap.sh` | Runs in the container: turns a fresh Debian 13 LXC into the server. Safe to re-run. |
 | `scripts/deploy.sh` | Runs on the Mac: copies `ollama/` + `scripts/` to the container and runs bootstrap |
 | `tests/smoke.sh` | Health check plus chat and decision timings |
-| `switchboard/` | The Python package ([its README](switchboard/README.md)) |
+| `switchboard/shared/` | What every language package shares: the job → model map (`jobs.toml`), the classify prompt, and test cases they must all pass |
+| `switchboard/python/` | The Python package ([overview](switchboard/README.md), [Python README](switchboard/python/README.md)) |
 
 ## Common tasks
 
