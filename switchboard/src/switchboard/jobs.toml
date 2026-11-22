@@ -1,0 +1,33 @@
+# switchboard job map. Apps ask for a *job* (chat, classify, ...); this file says which model does it.
+#
+# AI_ENV=dev|prod (env var or .env) picks the column. [env.<name>] values apply to every job in
+# that env, and a job's own table can override any of them. Model strings are LiteLLM names:
+# "<provider>/<model>". Keys other than model/method/api_base/timeout are passed straight to LiteLLM.
+#
+# A project can add or override jobs without editing this file: point SWITCHBOARD_CONFIG at its own
+# TOML file and it is merged on top of this one.
+
+[env.dev]
+api_base = "http://192.168.68.158:11434"  # Ollama in LXC 101 on the mini PC
+timeout = 300                             # seconds: a cold model takes 45-110 s just to load
+num_retries = 0                           # Ollama runs one request at a time; retries would just queue
+
+[env.prod]
+timeout = 60
+num_retries = 2
+
+[jobs.chat.dev]
+model = "ollama_chat/gemma4-cpu"
+think = false  # gemma4 thinks by default; on this CPU that's minutes of hidden tokens per reply
+
+[jobs.chat.prod]
+model = ""  # not chosen yet, e.g. "<provider>/<model>". The provider's API key goes in .env.
+
+[jobs.classify.dev]
+model = "ollama/tev1:4b"
+method = "systemone"  # tev1's native decision endpoint (/v1/systemone)
+timeout = 120
+
+[jobs.classify.prod]
+model = ""      # not chosen yet; any chat model that supports JSON-schema output works
+method = "json" # ask the model for the same answers as structured JSON

@@ -1,0 +1,4 @@
+# Models pulled from the Ollama library (one per line). bootstrap.sh pulls each one.
+# Local variants built on top of these live in ollama/modelfiles/<name>.Modelfile.
+gemma4:26b   # 18 GB, Q4_K_M mixture-of-experts (~4B active). Base for gemma4-cpu; don't call it directly.
+tev1:4b      # 4.6 GB decision/classification model, used via /v1/systemone

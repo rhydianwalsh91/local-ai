@@ -1,0 +1,4 @@
+FROM gemma4:26b
+# Turn off MTP speculative decoding. On this 4-core CPU it cut output from ~6 to ~2.5 tok/s,
+# because the draft model competes with the main model for the same CPU cores.
+PARAMETER draft_num_predict 0
