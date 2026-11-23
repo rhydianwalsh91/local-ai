@@ -18,8 +18,10 @@ Read it before changing server config.
 ## Hard rules
 
 - **Never touch VM 100** (192.168.68.161, alias `minipc`). It's a separate project.
-- RAM budget: the AI uses at most 28 GB of the host's 32 GB. The container is capped at 24 GB. Both
-  models together use ~23 GB, so **a third model can't be kept loaded alongside them**.
+- RAM budget: the AI uses at most 28 GB of the host's 32 GB. The container is capped at 25 GB. Both
+  models plus Open WebUI use ~24 GB, so **a third model can't be kept loaded alongside them**. At
+  24 GB the container thrashed (swap full, everything stalled ~30% of the time, Open WebUI and SSH
+  unresponsive). If things hang, check `memory.pressure` in `/sys/fs/cgroup/lxc/101/` on the host.
 - **The repo is public.** No secrets, keys, tokens or personal data. LAN IPs are fine. Keys live
   in `.env` (gitignored). `INSTRUCTIONS.md` is the owner's private handoff note and is gitignored. Keep it out of commits.
 - Keep the repo matching the server. Change config here, then run `scripts/deploy.sh`. Don't
@@ -30,7 +32,7 @@ Read it before changing server config.
 - `proxmox/create-lxc.sh` runs on the Proxmox host (`ssh minipc-hypervisor 'bash -s' < ...`).
 - `scripts/bootstrap.sh` runs inside the container (root, from `/opt/local-ai`). It must stay
   idempotent: check before acting, and restart Ollama only if the *effective* systemd environment changed.
-- `scripts/deploy.sh` runs on the Mac. It copies `ollama/` + `scripts/` to `/opt/local-ai` over SSH
+- `scripts/deploy.sh` runs on the Mac. It copies `ollama/`, `open-webui/` + `scripts/` to `/opt/local-ai` over SSH
   (tar, no rsync/git in the container), then runs bootstrap.
 - `tests/smoke.sh` runs on the Mac against the live API.
 - `switchboard/shared/` holds everything the language packages share: `jobs.toml` (the one
@@ -71,8 +73,13 @@ decision ~8 s warm.
 - `litellm.Timeout` isn't a subclass of `litellm.APIConnectionError`, so catch it first (see `_calls.py`).
 - Debug slowness by prompt size: `journalctl -u ollama | grep "new prompt"` and look at `task.n_tokens`.
 - Don't run big downloads in parallel. It caused `unexpected EOF` failures from registries.
-- Open WebUI and Docker were removed on purpose (hidden prompt bloat, background jobs queued ahead
-  of real requests). Don't reinstall them without asking.
+- Open WebUI (Docker, :8080) must keep the settings in `open-webui/open-webui.env`. Its defaults
+  attach built-in tools to every chat (~6,300 hidden tokens, ~5 min per message here) and run
+  background title/tag/follow-up requests that queue ahead of real ones. After changing its version
+  or settings, have a chat sent through it and check `task.n_tokens` in the Ollama log.
+- `ENABLE_PERSISTENT_CONFIG=False` means Open WebUI's admin settings screens don't stick. Settings
+  are changed in the env file and deployed. Its data (accounts, chats) is in the `open-webui` volume:
+  never delete that without asking.
 - The Mac's first SSH/ping to the mini PC sometimes fails with "No route to host" (a Wi-Fi/ARP
   hiccup). Retry before assuming the server is down.
 

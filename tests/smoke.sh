@@ -70,6 +70,13 @@ else
   bad "decision request failed"
 fi
 
+WEBUI_URL="${WEBUI_URL:-${URL%:*}:8080}"
+if curl -fsS -m 10 "$WEBUI_URL/health" >/dev/null 2>&1; then
+  ok "Open WebUI is up at $WEBUI_URL ($(curl -fsS -m 10 "$WEBUI_URL/api/version" | json 'print(d["version"])' 2>/dev/null || echo "version unknown"))"
+else
+  bad "Open WebUI isn't answering at $WEBUI_URL (try: ssh minipc-ai docker logs --tail 50 open-webui)"
+fi
+
 echo "Loaded now:"
 curl -fsS -m 10 "$URL/api/ps" | json "
 for m in d['models']: print(f'  {m[\"name\"]:<20} {m[\"size\"]/1e9:5.1f} GB  until {m[\"expires_at\"][:19]}')"

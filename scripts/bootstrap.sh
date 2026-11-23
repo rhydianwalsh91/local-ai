@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Turn a fresh Debian 13 LXC into the AI server, or bring an existing one in line with this repo.
+# Turn a fresh Debian 13 LXC into the AI server (Ollama + Open WebUI), or bring an existing one in
+# line with this repo.
 # Safe to re-run: every step checks first and only changes what's different.
 #
 # Normally run for you by scripts/deploy.sh. To run by hand inside the container:
@@ -12,6 +13,13 @@ set -euo pipefail
 OLLAMA_VERSION="${OLLAMA_VERSION:-0.40.16}"
 OVERRIDE_DST=/etc/systemd/system/ollama.service.d/override.conf
 OLLAMA_URL=http://127.0.0.1:11434
+
+OPEN_WEBUI_VERSION="${OPEN_WEBUI_VERSION:-v0.13.4}"
+OPEN_WEBUI_IMAGE="ghcr.io/open-webui/open-webui:$OPEN_WEBUI_VERSION"
+# Host networking so it can reach Ollama on 127.0.0.1 and serve :8080 directly. The memory cap
+# means that if Open WebUI ever balloons, it gets restarted instead of the kernel killing a model.
+OPEN_WEBUI_RUN_ARGS=(--network host --restart unless-stopped --memory 1536m
+  --env-file open-webui/open-webui.env -v open-webui:/app/backend/data)
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
@@ -104,6 +112,49 @@ for file in ollama/modelfiles/*.Modelfile; do
   fi
   echo "$name: built from $file"
 done
+
+step "Docker"
+if ! command -v docker >/dev/null 2>&1; then
+  echo "installing docker.io"
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq docker.io >/dev/null
+fi
+# One download at a time: parallel layer downloads from ghcr.io failed with `unexpected EOF` here.
+if ! cmp -s open-webui/daemon.json /etc/docker/daemon.json; then
+  install -D -m 644 open-webui/daemon.json /etc/docker/daemon.json
+  systemctl restart docker
+  echo "daemon.json updated"
+else
+  echo "already set up"
+fi
+
+step "Open WebUI $OPEN_WEBUI_VERSION"
+if ! docker image inspect "$OPEN_WEBUI_IMAGE" >/dev/null 2>&1; then
+  echo "pulling $OPEN_WEBUI_IMAGE (~4.6 GB)"
+  docker pull -q "$OPEN_WEBUI_IMAGE"
+fi
+# Fingerprint of everything that defines the container. If it matches the running one, leave it
+# alone; otherwise recreate it. Accounts and chats live in the open-webui volume and are kept.
+want="$( { echo "$OPEN_WEBUI_IMAGE"; printf '%s\n' "${OPEN_WEBUI_RUN_ARGS[@]}"; cat open-webui/open-webui.env; } | sha256sum | cut -c1-16)"
+have="$(docker inspect -f '{{index .Config.Labels "local-ai.config"}}' open-webui 2>/dev/null || true)"
+if [ "$want" != "$have" ]; then
+  echo "(re)creating container"
+  docker rm -f open-webui >/dev/null 2>&1 || true
+  docker run -d --name open-webui --label "local-ai.config=$want" "${OPEN_WEBUI_RUN_ARGS[@]}" "$OPEN_WEBUI_IMAGE" >/dev/null
+else
+  docker start open-webui >/dev/null
+  echo "unchanged"
+fi
+# Remove older Open WebUI images left behind by an upgrade (they're ~4.6 GB each).
+docker images ghcr.io/open-webui/open-webui --format '{{.Repository}}:{{.Tag}}' |
+  grep -vxF "$OPEN_WEBUI_IMAGE" | xargs -r docker rmi >/dev/null || true
+for _ in $(seq 1 90); do
+  curl -fsS http://127.0.0.1:8080/health >/dev/null 2>&1 && break
+  sleep 2
+done
+curl -fsS http://127.0.0.1:8080/health >/dev/null ||
+  { echo "Open WebUI didn't come up; see: docker logs open-webui" >&2; exit 1; }
+echo "up at http://$(hostname -I | awk '{print $1}'):8080"
 
 step "Done"
 ollama list
